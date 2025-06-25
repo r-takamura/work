@@ -6,7 +6,8 @@ import subprocess
 import tkinter as tk
 from tkinter import ttk, messagebox
 import sys
-import winreg # <-- 追加
+import winreg
+import tkinter.font as tkFont # <-- 追加
 
 def get_base_path():
     if getattr(sys, 'frozen', False):
@@ -38,7 +39,6 @@ def import_certificate_with_certutil(cert_path: str, password: str):
     except Exception as e:
         return False, f"予期しないエラーが発生しました: {e}"
 
-# --- 追加: ショートカット作成関連の関数 ---
 def get_desktop_path():
     """
     Windowsのレジストリからデスクトップのパスを取得します。
@@ -64,7 +64,6 @@ def create_url_shortcut(desktop_path, shortcut_name, url):
     except Exception as e:
         return False, f"ショートカットの作成に失敗しました:\n{e}"
 
-# --- 変更: install_certificates関数 ---
 def install_certificates(selected_sections, create_shortcut):
     """選択された複数の証明書をインストールし、必要であればショートカットを作成します。"""
     global certs_path, config
@@ -98,7 +97,6 @@ def get_selected_certificates():
     selected_indices = cert_list.curselection()
     return [available_certs_displayed[i] for i in selected_indices]
 
-# --- 変更: install_selected関数 ---
 def install_selected():
     selected_certs = get_selected_certificates()
     if not selected_certs:
@@ -140,6 +138,21 @@ if __name__ == "__main__":
     root.title("証明書インストーラー")
     root.geometry("650x600")
 
+    # --- 追加: ウィジェットサイズ変更のためのスタイル設定 ---
+    style = ttk.Style(root)
+    # 現在のテーマのデフォルトフォント情報を取得
+    default_font = tkFont.nametofont("TkDefaultFont")
+    font_family = default_font.actual()["family"]
+    default_size = default_font.actual()["size"]
+    # 1.25倍の新しいフォントサイズを計算
+    large_size = int(default_size * 1.25)
+
+    # 新しいスタイルを定義
+    style.configure("Large.TRadiobutton", font=(font_family, large_size))
+    style.configure("Large.TCheckbutton", font=(font_family, large_size))
+    style.configure("Large.TButton", font=(font_family, large_size), padding=(5, 5))
+
+
     if not config_path.exists():
         messagebox.showerror("エラー", f"設定ファイル '{config_path}' が見つかりません。")
         root.destroy()
@@ -177,10 +190,12 @@ if __name__ == "__main__":
 
     db_filter_var = tk.StringVar(value="ALL")
     for db_type in db_options:
-        radio_button = ttk.Radiobutton(filter_frame, text=db_type, variable=db_filter_var, value=db_type, command=filter_by_db)
+        # <-- 変更: スタイルを適用
+        radio_button = ttk.Radiobutton(filter_frame, text=db_type, variable=db_filter_var, value=db_type, command=filter_by_db, style="Large.TRadiobutton")
         radio_button.pack(side=tk.LEFT, padx=5)
 
-    show_hidden_check = ttk.Checkbutton(root, text="現在稼働していない事業所を表示", variable=show_hidden_var, command=filter_by_db)
+    # <-- 変更: スタイルを適用
+    show_hidden_check = ttk.Checkbutton(root, text="現在稼働していない事業所を表示", variable=show_hidden_var, command=filter_by_db, style="Large.TCheckbutton")
     show_hidden_check.pack(pady=5, anchor='w', padx=10)
 
     cert_label = ttk.Label(root, text="インストールする証明書を選択してください:")
@@ -195,28 +210,26 @@ if __name__ == "__main__":
     cert_list = tk.Listbox(cert_list_frame, height=15, width=80, yscrollcommand=cert_list_scrollbar.set, selectmode=tk.MULTIPLE, font=("Meiryo UI", 12))
     cert_list.pack(side=tk.LEFT, fill=tk.BOTH, expand=True)
     cert_list_scrollbar.config(command=cert_list.yview)
-    
-    # --- 追加: GUIにチェックボックスを配置 ---
-    create_shortcut_var = tk.BooleanVar(value=True)
-    option_frame = ttk.Frame(root)
-    option_frame.pack(side=tk.BOTTOM, padx=10, pady=(0,5), fill=tk.X)
-    shortcut_check = ttk.Checkbutton(option_frame, text="デスクトップにログイン用ショートカットを作成する", variable=create_shortcut_var)
-    shortcut_check.pack(side=tk.LEFT)
 
+    # --- 変更: チェックボックスとボタンの配置を1つのフレームに集約 ---
     bottom_frame = ttk.Frame(root)
     bottom_frame.pack(side=tk.BOTTOM, padx=10, pady=10, fill=tk.X)
 
-    button_frame = ttk.Frame(bottom_frame)
-    button_frame.pack(expand=True, fill='x')
-
-    select_all_button = ttk.Button(button_frame, text="全選択", command=select_all)
+    # 全選択/解除ボタン
+    select_all_button = ttk.Button(bottom_frame, text="全選択", command=select_all, style="Large.TButton")
     select_all_button.pack(side=tk.LEFT)
 
-    deselect_all_button = ttk.Button(button_frame, text="全選択解除", command=deselect_all)
+    deselect_all_button = ttk.Button(bottom_frame, text="全選択解除", command=deselect_all, style="Large.TButton")
     deselect_all_button.pack(side=tk.LEFT, padx=5)
 
-    install_button = ttk.Button(button_frame, text="インストール", command=install_selected, padding=(10, 5))
+    # インストールボタン (右端に配置)
+    install_button = ttk.Button(bottom_frame, text="インストール", command=install_selected, padding=(10, 5), style="Large.TButton")
     install_button.pack(side=tk.RIGHT)
+
+    # ショートカット作成チェックボックス (インストールボタンの左に配置)
+    create_shortcut_var = tk.BooleanVar(value=True)
+    shortcut_check = ttk.Checkbutton(bottom_frame, text="デスクトップにショートカットを作成", variable=create_shortcut_var, style="Large.TCheckbutton")
+    shortcut_check.pack(side=tk.RIGHT, padx=(0, 10)) 
 
     update_cert_list()
 
