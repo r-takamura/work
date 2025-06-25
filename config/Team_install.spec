@@ -2,10 +2,10 @@
 
 
 a = Analysis(
-    ['Team_install.py'],
+    ['Team_cert_install3.py'],
     pathex=[],
     binaries=[],
-    datas=[('config/config.ini', 'config'), ('config/certs', 'config/certs')],
+    datas=[],
     hiddenimports=[],
     hookspath=[],
     hooksconfig={},
@@ -22,7 +22,7 @@ exe = EXE(
     a.binaries,
     a.datas,
     [],
-    name='Team_install',
+    name='Team_cert_install3',
     debug=False,
     bootloader_ignore_signals=False,
     strip=False,
@@ -35,4 +35,5 @@ exe = EXE(
     target_arch=None,
     codesign_identity=None,
     entitlements_file=None,
+    icon=['my_icon.ico'],
 )
