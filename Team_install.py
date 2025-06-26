@@ -81,7 +81,7 @@ def install_certificates(selected_sections, create_shortcut):
             if install_success:
                 success_message = f"セクション '{section}' の証明書が正常にインストールされました。"
                 if create_shortcut:
-                    shortcut_name = section
+                    shortcut_name = f"Team_{section}"
                     url = f"https://care1.allm-team.net/{cert_num}/CareUiAuth/login"
                     sc_success, sc_message = create_url_shortcut(desktop_path, shortcut_name, url)
                     if not sc_success:
