@@ -7,7 +7,7 @@ import tkinter as tk
 from tkinter import ttk, messagebox
 import sys
 import winreg
-import tkinter.font as tkFont # <-- 追加
+import tkinter.font as tkFont
 
 def get_base_path():
     if getattr(sys, 'frozen', False):
@@ -20,7 +20,6 @@ config_path = base_path / "config" / "config.ini"
 certs_path = base_path / "config" / "certs"
 
 def import_certificate_with_certutil(cert_path: str, password: str):
-    """certutil.exe を使用して証明書をインポートします."""
     try:
         command = [
             "Certutil",
@@ -40,10 +39,6 @@ def import_certificate_with_certutil(cert_path: str, password: str):
         return False, f"予期しないエラーが発生しました: {e}"
 
 def get_desktop_path():
-    """
-    Windowsのレジストリからデスクトップのパスを取得します。
-    OneDriveで同期されている場合にも対応します。
-    """
     try:
         key = winreg.OpenKey(winreg.HKEY_CURRENT_USER, r'Software\Microsoft\Windows\CurrentVersion\Explorer\User Shell Folders')
         desktop_path = winreg.QueryValueEx(key, 'Desktop')[0]
@@ -53,7 +48,6 @@ def get_desktop_path():
         return os.path.join(os.path.expanduser('~'), 'Desktop')
 
 def create_url_shortcut(desktop_path, shortcut_name, url):
-    """指定されたパスにURLショートカット(.url)を作成します。"""
     safe_shortcut_name = "".join(c for c in shortcut_name if c.isalnum() or c in " _-").rstrip()
     shortcut_filepath = os.path.join(desktop_path, f"{safe_shortcut_name}.url")
     content = f"[InternetShortcut]\nURL={url}\n"
@@ -65,7 +59,6 @@ def create_url_shortcut(desktop_path, shortcut_name, url):
         return False, f"ショートカットの作成に失敗しました:\n{e}"
 
 def install_certificates(selected_sections, create_shortcut):
-    """選択された複数の証明書をインストールし、必要であればショートカットを作成します。"""
     global certs_path, config
     desktop_path = get_desktop_path()
 
@@ -79,31 +72,35 @@ def install_certificates(selected_sections, create_shortcut):
 
             install_success, install_message = import_certificate_with_certutil(cert_full_path, password)
             if install_success:
-                success_message = f"セクション '{section}' の証明書が正常にインストールされました。"
+                success_message = f"『{config[section].get('label', section)}』の証明書が正常にインストールされました。"
                 if create_shortcut:
-                    shortcut_name = f"Team_{section}"
+                    label_name = config[section].get('label', section)
+                    shortcut_name = f"Team_{label_name}"
                     url = f"https://care1.allm-team.net/{cert_num}/CareUiAuth/login"
                     sc_success, sc_message = create_url_shortcut(desktop_path, shortcut_name, url)
                     if not sc_success:
                         messagebox.showwarning("ショートカット作成失敗", sc_message)
                 messagebox.showinfo("成功", success_message)
             else:
-                messagebox.showerror("インストール失敗", f"セクション '{section}' のインストールに失敗しました。\n\n詳細:\n{install_message}")
+                messagebox.showerror("インストール失敗", f"『{config[section].get('label', section)}』のインストールに失敗しました。\n\n詳細:\n{install_message}")
         else:
-            messagebox.showerror("エラー", f"セクション '{section}' に cert_num または password が見つかりません。")
+            messagebox.showerror("エラー", f"『{config[section].get('label', section)}』に cert_num または password が見つかりません。")
 
 def get_selected_certificates():
-    """リストボックスで選択された証明書のセクション名を返します."""
     selected_indices = cert_list.curselection()
-    return [available_certs_displayed[i] for i in selected_indices]
+    # タプル (section, label) の 0 番目を取り出す
+    return [available_certs_displayed[i][0] for i in selected_indices]
 
 def install_selected():
     selected_certs = get_selected_certificates()
     if not selected_certs:
         messagebox.showerror("エラー", "インストールする証明書を選択してください。")
         return
-    
-    confirm_message = "以下の証明書をインストールしますか？\n\n- " + "\n- ".join(selected_certs)
+
+    # 表示用ラベルで確認メッセージを作成
+    confirm_labels = [config[sec].get('label', sec) for sec in selected_certs]
+    confirm_message = "以下の証明書をインストールしますか？\n\n- " + "\n- ".join(confirm_labels)
+
     if messagebox.askyesno("インストール確認", confirm_message):
         create_shortcut_flag = create_shortcut_var.get()
         install_certificates(selected_certs, create_shortcut_flag)
@@ -126,8 +123,11 @@ def update_cert_list(filter_text=None):
                 if filter_text is None or filter_text.lower() in section.lower():
                     display = True
             if display:
-                cert_list.insert(tk.END, f"{section}")
-                available_certs_displayed.append(section)
+                # ラベルを取得
+                label = config[section].get('label', section)
+                cert_list.insert(tk.END, label)
+                # タプルで保持
+                available_certs_displayed.append((section, label))
 
 def filter_by_db():
     selected_db = db_filter_var.get()
@@ -138,20 +138,15 @@ if __name__ == "__main__":
     root.title("証明書インストーラー")
     root.geometry("650x600")
 
-    # --- 追加: ウィジェットサイズ変更のためのスタイル設定 ---
     style = ttk.Style(root)
-    # 現在のテーマのデフォルトフォント情報を取得
     default_font = tkFont.nametofont("TkDefaultFont")
     font_family = default_font.actual()["family"]
     default_size = default_font.actual()["size"]
-    # 1.25倍の新しいフォントサイズを計算
     large_size = int(default_size * 1.25)
 
-    # 新しいスタイルを定義
     style.configure("Large.TRadiobutton", font=(font_family, large_size))
     style.configure("Large.TCheckbutton", font=(font_family, large_size))
     style.configure("Large.TButton", font=(font_family, large_size), padding=(5, 5))
-
 
     if not config_path.exists():
         messagebox.showerror("エラー", f"設定ファイル '{config_path}' が見つかりません。")
@@ -175,7 +170,7 @@ if __name__ == "__main__":
             for db_type in ["DB1", "DB2", "DB3", "DB4"]:
                 if db_type.lower() in section.lower() and db_type not in db_options:
                     db_options.append(db_type)
-    
+
     sorted_dbs = sorted([opt for opt in db_options if opt != "ALL"])
     db_options = ["ALL"] + sorted_dbs
 
@@ -190,12 +185,16 @@ if __name__ == "__main__":
 
     db_filter_var = tk.StringVar(value="ALL")
     for db_type in db_options:
-        # <-- 変更: スタイルを適用
-        radio_button = ttk.Radiobutton(filter_frame, text=db_type, variable=db_filter_var, value=db_type, command=filter_by_db, style="Large.TRadiobutton")
+        radio_button = ttk.Radiobutton(
+            filter_frame, text=db_type, variable=db_filter_var, value=db_type,
+            command=filter_by_db, style="Large.TRadiobutton"
+        )
         radio_button.pack(side=tk.LEFT, padx=5)
 
-    # <-- 変更: スタイルを適用
-    show_hidden_check = ttk.Checkbutton(root, text="現在稼働していない事業所を表示", variable=show_hidden_var, command=filter_by_db, style="Large.TCheckbutton")
+    show_hidden_check = ttk.Checkbutton(
+        root, text="現在稼働していない事業所を表示",
+        variable=show_hidden_var, command=filter_by_db, style="Large.TCheckbutton"
+    )
     show_hidden_check.pack(pady=5, anchor='w', padx=10)
 
     cert_label = ttk.Label(root, text="インストールする証明書を選択してください:")
@@ -207,30 +206,29 @@ if __name__ == "__main__":
     cert_list_scrollbar = ttk.Scrollbar(cert_list_frame, orient=tk.VERTICAL)
     cert_list_scrollbar.pack(side=tk.RIGHT, fill=tk.Y)
 
-    cert_list = tk.Listbox(cert_list_frame, height=15, width=80, yscrollcommand=cert_list_scrollbar.set, selectmode=tk.MULTIPLE, font=("Meiryo UI", 12))
+    cert_list = tk.Listbox(
+        cert_list_frame, height=15, width=80,
+        yscrollcommand=cert_list_scrollbar.set,
+        selectmode=tk.MULTIPLE, font=("Meiryo UI", 12)
+    )
     cert_list.pack(side=tk.LEFT, fill=tk.BOTH, expand=True)
     cert_list_scrollbar.config(command=cert_list.yview)
 
-    # --- 変更: チェックボックスとボタンの配置を1つのフレームに集約 ---
     bottom_frame = ttk.Frame(root)
     bottom_frame.pack(side=tk.BOTTOM, padx=10, pady=10, fill=tk.X)
 
-    # 全選択/解除ボタン
     select_all_button = ttk.Button(bottom_frame, text="全選択", command=select_all, style="Large.TButton")
     select_all_button.pack(side=tk.LEFT)
 
     deselect_all_button = ttk.Button(bottom_frame, text="全選択解除", command=deselect_all, style="Large.TButton")
     deselect_all_button.pack(side=tk.LEFT, padx=5)
 
-    # インストールボタン (右端に配置)
     install_button = ttk.Button(bottom_frame, text="インストール", command=install_selected, padding=(10, 5), style="Large.TButton")
     install_button.pack(side=tk.RIGHT)
 
-    # ショートカット作成チェックボックス (インストールボタンの左に配置)
     create_shortcut_var = tk.BooleanVar(value=True)
     shortcut_check = ttk.Checkbutton(bottom_frame, text="デスクトップにショートカットを作成", variable=create_shortcut_var, style="Large.TCheckbutton")
-    shortcut_check.pack(side=tk.RIGHT, padx=(0, 10)) 
+    shortcut_check.pack(side=tk.RIGHT, padx=(0, 10))
 
     update_cert_list()
-
     root.mainloop()
